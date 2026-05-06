@@ -1,0 +1,4 @@
+# QLoRA 额外依赖：建议在 Linux + CUDA 环境安装。
+# Windows 上 bitsandbytes 可用性取决于当前 wheel 与 CUDA 版本。
+bitsandbytes>=0.43.3
+

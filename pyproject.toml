@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "adaptive-lora-thesis"
+version = "0.1.0"
+description = "基于智能优化的自适应低秩大模型微调方法研究实验工程"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "adaptive-lora-thesis" }
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+

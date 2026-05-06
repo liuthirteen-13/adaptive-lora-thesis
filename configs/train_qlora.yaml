@@ -1,0 +1,54 @@
+# QLoRA 训练配置模板：真正运行前请确认 bitsandbytes 与 CUDA 环境可用
+model:
+  name_or_path: Qwen/Qwen2.5-1.5B-Instruct
+  trust_remote_code: true
+  torch_dtype: bfloat16
+  device_map: auto
+
+data:
+  train_path: data/processed/instruction_train.jsonl
+  eval_path:
+  max_seq_length: 1024
+  eval_ratio: 0.05
+  max_samples:
+  train_on_prompt: false
+
+lora:
+  r: 8
+  lora_alpha: 16
+  lora_dropout: 0.05
+  bias: none
+  # PEFT 文档推荐 QLoRA 风格训练对所有线性层注入 LoRA。
+  target_modules: all-linear
+  rank_pattern:
+
+quantization:
+  load_in_4bit: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_compute_dtype: bfloat16
+  bnb_4bit_use_double_quant: true
+
+training:
+  output_dir: outputs/qwen25_qlora
+  num_train_epochs: 1
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 8
+  learning_rate: 0.0002
+  warmup_ratio: 0.03
+  weight_decay: 0.0
+  logging_steps: 10
+  save_steps: 200
+  eval_steps: 200
+  save_total_limit: 2
+  bf16: true
+  fp16: false
+  gradient_checkpointing: true
+  optim: paged_adamw_8bit
+  report_to: none
+  seed: 42
+
+run:
+  dry_run: true
+  qlora: true
+

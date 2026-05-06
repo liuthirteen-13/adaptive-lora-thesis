@@ -1,0 +1,94 @@
+# PSO 自适应 rank 分配 LoRA 搜索配置。
+# 默认 dry-run 保护：真实搜索需显式追加 --run。
+model:
+  name_or_path: Qwen/Qwen2.5-1.5B-Instruct
+  trust_remote_code: true
+  torch_dtype: float16
+  device_map:
+  num_hidden_layers: 28
+  hidden_size: 1536
+  intermediate_size: 8960
+
+data:
+  train_file: data/processed/instruction_train.jsonl
+  eval_file:
+  format: auto
+  max_length: 256
+  max_samples: 8
+  max_eval_samples: 4
+  eval_ratio: 0.25
+  train_on_prompt: false
+
+lora:
+  r: 8
+  lora_alpha: 16
+  lora_dropout: 0.05
+  target_modules:
+    - q_proj
+    - v_proj
+  bias: none
+
+training:
+  output_dir: experiments/rank_search/ours_pso/final_lora_adapter
+  seed: 42
+  num_train_epochs: 1
+  max_steps: 2
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 1
+  learning_rate: 0.0002
+  warmup_ratio: 0.0
+  weight_decay: 0.0
+  logging_steps: 1
+  save_steps: 2
+  eval_steps: 2
+  save_total_limit: 1
+  fp16: true
+  bf16: false
+  gradient_checkpointing: true
+  optim: adamw_torch
+  report_to: none
+
+search:
+  seed: 42
+  particles: 2
+  iterations: 1
+  max_trials: 2
+  candidate_ranks: [0, 2, 4, 8, 16, 32]
+  inertia: 0.7
+  cognitive: 1.4
+  social: 1.4
+  alpha_multiplier: 2.0
+  importance_path: results/importance/*.json
+
+fitness:
+  mode: train_eval
+  metric_name: neg_eval_loss
+  lambda_param: 0.1
+  lambda_time: 0.02
+  # 约等于 q_proj/v_proj 全层 r=16 的 LoRA 参数量，用于参数预算归一化。
+  param_budget: 2200000
+  time_budget_seconds: 180
+  train_subset_size: 8
+  eval_subset_size: 4
+  max_train_steps: 2
+  eval_ratio: 0.25
+
+output:
+  run_dir: experiments/rank_search/ours_pso
+
+final_training:
+  data:
+    max_samples:
+    max_eval_samples:
+  training:
+    output_dir: outputs/ours_pso_rank_lora_qwen25
+    max_steps: -1
+    gradient_accumulation_steps: 8
+    logging_steps: 10
+    save_steps: 100
+    eval_steps: 100
+
+run:
+  dry_run: true
+  qlora: false

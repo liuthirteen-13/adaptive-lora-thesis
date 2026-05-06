@@ -1,0 +1,56 @@
+# GSM8K 普通 LoRA 快速训练配置。
+# 用途：先完整跑通一轮小规模训练，确认模型、数据、显存和保存流程可用；正式论文结果请再扩大样本与步数。
+model:
+  name_or_path: models/Qwen2.5-1.5B-Instruct
+  trust_remote_code: true
+  torch_dtype: float16
+  device_map:
+
+data:
+  train_file: data/processed/gsm8k_train.jsonl
+  eval_file:
+  format: auto
+  max_length: 256
+  max_samples: 200
+  max_eval_samples:
+  eval_ratio: 0.1
+  train_on_prompt: false
+
+lora:
+  r: 8
+  lora_alpha: 16
+  lora_dropout: 0.05
+  target_modules:
+    - q_proj
+    - v_proj
+  bias: none
+
+training:
+  output_dir: outputs/lora_r8_qwen25_gsm8k_quick
+  seed: 42
+  num_train_epochs: 1
+  max_steps: 20
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 1
+  learning_rate: 0.0002
+  warmup_ratio: 0.03
+  weight_decay: 0.0
+  logging_steps: 5
+  save_steps: 20
+  eval_steps: 20
+  save_total_limit: 1
+  fp16: true
+  bf16: false
+  gradient_checkpointing: true
+  optim: adamw_torch
+  report_to: none
+
+evaluation:
+  max_samples: 32
+  max_new_tokens: 256
+  temperature: 0.0
+  top_p: 1.0
+  do_sample: false
+  output_file: experiments/runs/lora_r8_gsm8k_quick_eval.json
+

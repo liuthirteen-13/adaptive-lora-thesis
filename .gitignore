@@ -1,0 +1,44 @@
+# Python 缓存与虚拟环境
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# 训练产物通常较大，不进入版本管理
+outputs/*
+!outputs/.gitkeep
+experiments/runs/*
+!experiments/runs/.gitkeep
+experiments/rank_patterns/*.json
+!experiments/rank_patterns/example_rank_pattern.json
+experiments/rank_search/*
+!experiments/rank_search/.gitkeep
+results/logs/*
+!results/logs/.gitkeep
+results/importance/*
+!results/importance/.gitkeep
+results/tables/*
+!results/tables/.gitkeep
+results/figures/*
+!results/figures/.gitkeep
+
+# 数据集与模型权重按需本地放置
+models/*
+!models/.gitkeep
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# 本地环境文件
+.env
+.vscode/
+.idea/

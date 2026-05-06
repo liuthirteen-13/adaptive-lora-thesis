@@ -1,0 +1,72 @@
+# QLoRA r=8 baseline 配置。默认 dry-run，真实训练需传 --run。
+model:
+  name_or_path: Qwen/Qwen2.5-1.5B-Instruct
+  trust_remote_code: true
+  torch_dtype: float16
+  # QLoRA 使用 bitsandbytes 4-bit 加载，device_map=auto 便于自动放置量化权重。
+  device_map: auto
+  low_cpu_mem_usage: true
+
+data:
+  # 与普通 LoRA 共用 JSONL/GSM8K 数据字段，便于直接替换训练入口。
+  train_file: data/processed/instruction_train.jsonl
+  eval_file:
+  format: auto
+  max_length: 256
+  max_samples:
+  max_eval_samples:
+  eval_ratio: 0.05
+  train_on_prompt: false
+
+lora:
+  r: 8
+  lora_alpha: 16
+  lora_dropout: 0.05
+  # QLoRA baseline 默认覆盖所有线性层；如需与普通 LoRA 完全同模块对比，可改为 [q_proj, v_proj]。
+  target_modules: all-linear
+  bias: none
+  rank_pattern:
+
+quantization:
+  load_in_4bit: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_compute_dtype: float16
+  bnb_4bit_use_double_quant: true
+
+training:
+  output_dir: outputs/qlora_r8_qwen25
+  overwrite_output_dir: false
+  seed: 42
+  num_train_epochs: 1
+  max_steps: -1
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 8
+  learning_rate: 0.0002
+  warmup_ratio: 0.03
+  weight_decay: 0.0
+  logging_steps: 10
+  save_steps: 100
+  eval_steps: 100
+  save_total_limit: 2
+  fp16: true
+  bf16: false
+  gradient_checkpointing: true
+  optim: paged_adamw_8bit
+  report_to: none
+
+logging:
+  log_dir: results/logs
+
+evaluation:
+  max_samples: 32
+  max_new_tokens: 256
+  temperature: 0.0
+  top_p: 1.0
+  do_sample: false
+  output_file: experiments/runs/qlora_r8_eval.json
+
+run:
+  name: qlora_r8_qwen25
+  dry_run: true
+  qlora: true

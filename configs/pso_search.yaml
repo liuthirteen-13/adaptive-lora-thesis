@@ -1,0 +1,38 @@
+# 粒子群搜索 layer-wise LoRA rank 的配置模板
+model:
+  name_or_path: Qwen/Qwen2.5-1.5B-Instruct
+  num_hidden_layers: 28
+
+search:
+  seed: 42
+  particles: 8
+  iterations: 5
+  min_rank: 2
+  max_rank: 32
+  rank_step: 2
+  inertia: 0.7
+  cognitive: 1.4
+  social: 1.4
+  # Qwen2.5 常见 LoRA 注入模块。后续可按论文实验缩小搜索空间。
+  target_modules:
+    - self_attn.q_proj
+    - self_attn.k_proj
+    - self_attn.v_proj
+    - self_attn.o_proj
+    - mlp.gate_proj
+    - mlp.up_proj
+    - mlp.down_proj
+
+objective:
+  metric_name: eval_exact_match
+  param_penalty: 0.000001
+  train_command_template: python scripts/train_lora.py --config configs/train_lora.yaml --rank-pattern {rank_pattern} --output-dir {output_dir} --no-dry-run
+  eval_command_template: python scripts/evaluate.py --config configs/eval.yaml --adapter-path {output_dir} --no-dry-run
+
+output:
+  rank_pattern_dir: experiments/rank_patterns
+  run_dir: experiments/runs/pso_rank_search
+
+run:
+  dry_run: true
+

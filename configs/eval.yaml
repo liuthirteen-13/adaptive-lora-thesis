@@ -1,0 +1,24 @@
+# 评估配置模板：支持基础模型或 PEFT adapter
+model:
+  name_or_path: Qwen/Qwen2.5-1.5B-Instruct
+  adapter_path:
+  trust_remote_code: true
+  torch_dtype: auto
+  device_map: auto
+
+data:
+  path: data/processed/instruction_train.jsonl
+  max_samples: 32
+
+generation:
+  max_new_tokens: 256
+  temperature: 0.0
+  top_p: 1.0
+  do_sample: false
+
+output:
+  file: experiments/runs/eval_result.json
+
+run:
+  dry_run: true
+
