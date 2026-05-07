@@ -12,6 +12,7 @@ from typing import Any, Iterable
 
 
 METHOD_ORDER = ["Base", "Prompt", "LoRA", "QLoRA", "AdaLoRA", "Ours"]
+SENTINEL_ABS_LIMIT = 1.0e20
 
 
 @dataclass
@@ -51,9 +52,15 @@ def collect_experiment_records(
             records.extend(records_from_json(path, source_hint="logs"))
 
     if include_discovered:
+        metric_output_dirs = {
+            path.parent.resolve() for path in sorted(Path("outputs").glob("*/training_metrics.json"))
+        }
         for path in sorted(Path("outputs").glob("*/training_metrics.json")):
             records.extend(records_from_json(path, source_hint="training_metrics"))
         for path in sorted(Path("outputs").glob("*/checkpoint-*/trainer_state.json")):
+            output_dir = path.parents[1].resolve() if len(path.parents) > 1 else path.parent.resolve()
+            if output_dir in metric_output_dirs:
+                continue
             records.extend(records_from_json(path, source_hint="trainer_state"))
         for path in sorted(Path("experiments/rank_search").glob("**/trial_record.json")):
             records.extend(records_from_json(path, source_hint="pso_trial"))
@@ -183,13 +190,15 @@ def record_from_pso_trial(data: dict[str, Any], path: Path) -> ExperimentRecord:
     eval_metric = as_float(result.get("eval_metric"))
     if eval_metric is None and eval_loss is not None:
         eval_metric = -eval_loss
+    # 搜索失败时会写入极大惩罚值，这类占位值不能进入论文图表。
+    inferred_eval_loss = eval_loss if eval_loss is not None else (-eval_metric if eval_metric is not None else None)
     return ExperimentRecord(
         method="Ours",
         run_name=str(data.get("trial_id") or path.parent.name),
         status=str(result.get("status", "unknown")),
         metric_name="neg_eval_loss",
         eval_metric=eval_metric,
-        eval_loss=eval_loss if eval_loss is not None else (-eval_metric if eval_metric is not None else None),
+        eval_loss=as_float(inferred_eval_loss),
         train_loss=None,
         score=as_float(result.get("score")),
         trainable_params=as_int(detail.get("trainable_params_actual") or result.get("trainable_params_estimate")),
@@ -360,7 +369,12 @@ def as_float(value: Any) -> float | None:
         number = float(value)
     except (TypeError, ValueError):
         return None
-    return number if math.isfinite(number) else None
+    if not math.isfinite(number):
+        return None
+    # PSO 搜索失败时使用 +/-1e30 作为惩罚占位，汇总图表应视为空值。
+    if abs(number) >= SENTINEL_ABS_LIMIT:
+        return None
+    return number
 
 
 def as_int(value: Any) -> int | None:
@@ -389,4 +403,3 @@ def last_value(history: list[dict[str, float]], key: str) -> float | None:
 def safe_filename(value: str) -> str:
     """把方法名转换成安全文件名片段。"""
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", value).strip("_").lower() or "record"
-

@@ -7,6 +7,7 @@ python src/analysis/plot_results.py
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,7 @@ from analysis.make_tables import build_efficiency_rows, build_main_rows  # noqa:
 from analysis.utils import (  # noqa: E402
     METHOD_ORDER,
     ExperimentRecord,
+    best_records_by_method,
     collect_experiment_records,
     load_rank_pattern,
     read_csv_rows,
@@ -67,10 +69,17 @@ def main() -> None:
 def setup_matplotlib() -> None:
     """设置适合论文的 matplotlib 中文显示与基础样式。"""
     import matplotlib.pyplot as plt
+    from matplotlib import font_manager
 
+    chinese_fonts = ["Microsoft YaHei", "SimHei", "Noto Sans CJK SC", "WenQuanYi Zen Hei", "Arial Unicode MS"]
+    installed_fonts = {font.name for font in font_manager.fontManager.ttflist}
+    selected_fonts = [font for font in chinese_fonts if font in installed_fonts]
+    if not selected_fonts:
+        print("警告：未检测到中文字体，图中文字可能显示为方框；Linux 服务器可安装 fonts-noto-cjk 后重画。")
+    selected_fonts.append("DejaVu Sans")
     plt.rcParams.update(
         {
-            "font.sans-serif": ["Microsoft YaHei", "SimHei", "Noto Sans CJK SC", "Arial Unicode MS", "DejaVu Sans"],
+            "font.sans-serif": selected_fonts,
             "axes.unicode_minus": False,
             "figure.dpi": 120,
             "savefig.dpi": 300,
@@ -103,17 +112,19 @@ def plot_loss_curves(records: list[ExperimentRecord], figures_dir: Path) -> None
 
     fig, ax = plt.subplots(figsize=(7.0, 4.5))
     plotted = False
-    for record in sorted(records, key=lambda item: (method_index(item.method), item.run_name)):
-        history = record.loss_history or single_point_history(record)
+    # 论文主图只展示每个方法的最佳成功记录，避免 PSO 中间 trial 和失败占位值污染坐标轴。
+    for record in best_records_by_method(records):
+        history = clean_loss_history(record.loss_history or single_point_history(record))
         if not history:
             continue
-        steps = [item["step"] for item in history]
         if any("loss" in item for item in history):
-            values = [item.get("loss") for item in history]
+            train_points = [(item["step"], item["loss"]) for item in history if "loss" in item]
+            steps, values = zip(*train_points, strict=False)
             ax.plot(steps, values, marker="o", linewidth=1.6, label=f"{record.method}-训练")
             plotted = True
         if any("eval_loss" in item for item in history):
-            values = [item.get("eval_loss") for item in history]
+            eval_points = [(item["step"], item["eval_loss"]) for item in history if "eval_loss" in item]
+            steps, values = zip(*eval_points, strict=False)
             ax.plot(steps, values, marker="s", linestyle="--", linewidth=1.6, label=f"{record.method}-验证")
             plotted = True
 
@@ -123,7 +134,7 @@ def plot_loss_curves(records: list[ExperimentRecord], figures_dir: Path) -> None
     ax.set_xlabel("训练步数")
     ax.set_ylabel("Loss")
     ax.grid(True, linestyle="--", alpha=0.35)
-    ax.legend(loc="best", frameon=False)
+    deduplicate_legend(ax)
     save_figure(fig, figures_dir / "loss_curves")
 
 
@@ -211,11 +222,30 @@ def plot_memory_comparison(efficiency_rows: list[dict[str, str]], figures_dir: P
 def single_point_history(record: ExperimentRecord) -> list[dict[str, float]]:
     """缺少完整曲线时，用最终 train/eval loss 形成单点图。"""
     point: dict[str, float] = {"step": 1.0}
-    if record.train_loss is not None:
+    if is_valid_loss(record.train_loss):
         point["loss"] = record.train_loss
-    if record.eval_loss is not None:
+    if is_valid_loss(record.eval_loss):
         point["eval_loss"] = record.eval_loss
     return [point] if len(point) > 1 else []
+
+
+def clean_loss_history(history: list[dict[str, float]]) -> list[dict[str, float]]:
+    """过滤失败 trial 的异常 loss，防止 1e30 等惩罚值拉爆坐标轴。"""
+    cleaned: list[dict[str, float]] = []
+    for item in history:
+        row: dict[str, float] = {"step": item.get("step", float(len(cleaned) + 1))}
+        if is_valid_loss(item.get("loss")):
+            row["loss"] = item["loss"]
+        if is_valid_loss(item.get("eval_loss")):
+            row["eval_loss"] = item["eval_loss"]
+        if len(row) > 1:
+            cleaned.append(row)
+    return cleaned
+
+
+def is_valid_loss(value: float | None) -> bool:
+    """论文实验中的 loss 应为有限的正常小数；失败惩罚值按无效处理。"""
+    return value is not None and math.isfinite(value) and 0.0 <= value < 100.0
 
 
 def draw_empty_message(ax: Any, message: str) -> None:
@@ -262,4 +292,3 @@ def method_index(method: str) -> int:
 
 if __name__ == "__main__":
     main()
-
